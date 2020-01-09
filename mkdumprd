@@ -247,19 +247,8 @@ usage () {
 }
 
 moduledep() {
-    if [ ! -f "/lib/modules/$kernel/modules.dep" ]; then
-	error "No dep file found for kernel $kernel"
-	cleanup_and_exit 1
-    fi
+    deps=""
 
-    deps=$(awk 'BEGIN { searched=ARGV[2]; ARGV[2]=""; rc=1 } \
-                function modname(filename) { match(filename, /\/([^\/]+)\.k?o:?$/, ret); return ret[1] } \
-                function show() { if (orig == searched) { print dep; orig=""; rc=0; exit } } \
-                /^\/lib/ { show(); \
-                           orig=modname($1); dep=""; \
-                           if ($2) { for (i = 2; i <= NF; i++) { dep=sprintf("%s %s", dep, modname($i)); } } } \
-                /^	/ { dep=sprintf("%s %s", dep, modname($1));  } \
-                END      { show(); exit(rc) }' /lib/modules/$kernel/modules.dep $1)
     for i in `modprobe --set-version $kernel --show-depends $1 2>/dev/null | awk '/^insmod/ {print $2}'`
     do
        modname=`basename $i | sed -e's/\.ko//'`
@@ -413,6 +402,7 @@ depsolve_modlist()
 findmodule() {
     local skiperrors=""
     local mod_found=0
+    local deps
 
     if [ $1 == "--skiperrors" ]; then
         skiperrors=--skiperrors
@@ -420,7 +410,6 @@ findmodule() {
     fi
 
     local modName=$1
-    local skipdeps=$2
 
     if [ "$modName" = "off" -o "$modName" = "null" ]; then
         return
@@ -460,13 +449,10 @@ findmodule() {
         findmodule ohci1394
         modName="sbp2"
     else
-        if [ -z "$skipdeps" ]
-        then
-            moduledep $modName
-            for i in $deps; do
-                findmodule $i
-            done
-        fi
+        moduledep $modName
+        for i in $deps; do
+            findmodule $i
+        done
     fi
 
     fmPath=$(modprobe --set-version $kernel -l $modName 2>/dev/null)
@@ -1688,12 +1674,12 @@ fi
 # We're likely to need them
 for i in `lsmod | tail --lines=+2 | awk '{print $1}'`
 do
-    findmodule -$i skip
+    findmodule -$i
     echo $MODULES | grep -q $i
     if [ $? -ne 0 ]
     then
         ALTERNATE=`echo $i | sed -e's/_/-/g'`
-        findmodule $ALTERNATE skip
+        findmodule $ALTERNATE
     fi
 
 done

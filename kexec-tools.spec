@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.0 
-Release: 300%{?dist}.1
+Release: 300%{?dist}.2
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -503,6 +503,10 @@ done
 %endif
 
 %changelog
+* Fri Dec 16 2016 Baoquan He <bhe@redhat.com> - 2.0.0-300.2
+mkdumprd: Allow findmodule() to add dependency for lsmod output, resolves bug 1403699
+mkdumprd: Kill useless code in moduledep(), resolves bug 1403699
+
 * Wed Sep 14 2016 Baoquan He <bhe@redhat.com> - 2.0.0-300.1
 - mkdumprd: skip logical interfaces for bridge, resolves bug 1375890
 
