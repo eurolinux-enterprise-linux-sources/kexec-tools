@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.0 
-Release: 307%{?dist}
+Release: 307%{?dist}.1
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -505,6 +505,9 @@ done
 %endif
 
 %changelog
+* Tue Sep 26 2017 Baoquan He <bhe@redhat.com> - 2.0.0-307.1
+- Improve 'cpu add' udev rules, resolves bug 1494022
+
 * Fri Jan 20 2017 Baoquan He <bhe@redhat.com> - 2.0.0-307
 - mkdumprd: add mdmon binary for raid1 support, resolves bug 1404263
 
