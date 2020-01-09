@@ -1194,6 +1194,10 @@ handlenetdev() {
             BUS_ID=`ls -l /sys/class/net/$dev/device | sed -e's/\(.*\/\)\(.*$\)/\2/'`
             echo >> $MNTIMAGE/etc/ifcfg-$dev
             echo "BUS_ID=\"$BUS_ID\"" >> $MNTIMAGE/etc/ifcfg-$dev
+            #DEV_ID is used for physical interfaces to distinguish different ports of the shared
+            #multiport card(thus of the same BUS_ID). Please see the logic in map_interface.
+            DEV_ID=`cat /sys/class/net/$dev/dev_id`
+            echo "DEV_ID=\"$DEV_ID\"" >> $MNTIMAGE/etc/ifcfg-$dev
         fi
     fi
 }
@@ -1599,7 +1603,7 @@ get_pcs_cluster_nodes()
 # Retrieves value of option defined in /etc/kdump.conf.
 get_option_value()
 {
-    echo $(strip_comments `grep ^$1 /etc/kdump.conf | tail -1 | cut -d\  -f2-`)
+    echo $(strip_comments `grep ^$1 $KDUMP_CONFIG_FILE | tail -1 | cut -d\  -f2-`)
 }
 
 # Tests if fence_kdump is configured using options in /etc/kdump.conf.
@@ -1607,7 +1611,7 @@ is_generic_fence_kdump()
 {
     [ -x /usr/sbin/fence_kdump_send ] || return 1
 
-    grep -q "^fence_kdump_nodes" /etc/kdump.conf
+    grep -q "^fence_kdump_nodes" $KDUMP_CONFIG_FILE
 }
 
 # Reads list of cluster nodes, filters local IPs and setups network for them.
@@ -2115,12 +2119,14 @@ cd - > /dev/null 2>&1
 if [ -f /etc/mdadm.conf ]
 then
         cp /etc/mdadm.conf $MNTIMAGE/etc
-        bin="$bin /sbin/mdadm"
+        bin="$bin /sbin/mdadm /sbin/mdmon"
 fi
 
 # we need the fstab file so that we can fsck properly
 cp /etc/fstab $MNTIMAGE/etc/fstab
 bin="$bin /sbin/fsck.ext2 /sbin/fsck.ext3 /sbin/fsck.ext4"
+
+grep -v "^#"  $KDUMP_CONFIG_FILE | cat >> $MNTIMAGE/etc/kdump.conf
 
 if [ -f "$TMPDISKLIST" ]; then
     mv $TMPDISKLIST $MNTIMAGE/etc/critical_disks
@@ -2279,38 +2285,6 @@ chmod 755 $MNTIMAGE/usr/share/udhcpc/default.script
 SCRIPTDIR=$MNTIMAGE/scriptfns
 mkdir -p $SCRIPTDIR
 
-cat >> $SCRIPTDIR/load_selinux_policy << EOF
-#!/bin/hush
-
-ROOTPATH=\$1
-NEEDSELINUX=1
-LOADPOL=
-grep -q selinux=0 /proc/cmdline
-if [ \$? -eq 0 ]
-then
-	NEEDSELINUX=0
-fi
-
-if [ -x \$ROOTPATH/usr/sbin/load_policy ]
-then
-	LOADPOL=/usr/sbin/load_policy
-fi
-if [ -x \$ROOTPATH/sbin/load_policy ]
-then
-	LOADPOL=/sbin/load_policy
-fi
-
-if [ \$NEEDSELINUX -eq 1 -a -n "\$LOADPOL" ]
-then
-	echo "Loading SELINUX policy"
-	chroot \$ROOTPATH \$LOADPOL -i
-        if [ \$? -ge 2 ]
-        then
-            echo "Policy load failed, a relabel will be required on reboot"
-        fi 
-fi
-EOF
-
 cat >> $SCRIPTDIR/show_memstats << EOF
 #!/bin/hush
 while [ \$# -gt 0 ]; do
@@ -2348,7 +2322,6 @@ HWADDR=""
 NETDEV=\$1
 . /etc/ifcfg-\$NETDEV
 HWADDR=\`echo "\$HWADDR" | awk '{print toupper(\$1)}'\`
-DEV_ID=\`cat /sys/class/net/\$NETDEV/dev_id\`
 
 for j in \`ifconfig -a | awk '/.*Link encap.*/ {print \$1}'\`
 do
@@ -2977,6 +2950,7 @@ mount -t devpts -o gid=5,mode=620 /dev/pts /dev/pts
 mkdir /dev/shm
 mkdir /dev/mapper
 echo Creating initial device nodes
+mknod /dev/mem c 1 1
 mknod /dev/null c 1 3
 mknod /dev/zero c 1 5
 mknod /dev/systty c 4 0
@@ -3249,16 +3223,9 @@ fi
 
 cat >> $MNTIMAGE/init << EOF
 echo "Waiting for required block device discovery"
-block_mknod() {
+
+block_part_mknod() {
     local dev_name=\$1 major minor part_name part_path
-
-    [ -b /dev/\$dev_name ] && return
-
-    major=\`cat /sys/block/\$dev_name/dev | cut -d":" -f1\`
-    minor=\`cat /sys/block/\$dev_name/dev | cut -d":" -f2\`
-
-    echo "Creating block device \$dev_name"
-    mknod /dev/\$dev_name b \$major \$minor
 
     hdparm -z /dev/\$dev_name >/dev/null 2>/dev/null
     for part_name in \`ls /sys/block/\$dev_name/ | grep ^\$dev_name\`
@@ -3270,6 +3237,20 @@ block_mknod() {
             mknod /dev/\$part_name b \$major \$minor
         fi
     done
+}
+
+block_mknod() {
+    local dev_name=\$1 major minor
+
+    [ -b /dev/\$dev_name ] && return
+
+    major=\`cat /sys/block/\$dev_name/dev | cut -d":" -f1\`
+    minor=\`cat /sys/block/\$dev_name/dev | cut -d":" -f2\`
+
+    echo "Creating block device \$dev_name"
+    mknod /dev/\$dev_name b \$major \$minor
+
+    block_part_mknod \$dev_name
 }
 
 wait_critical_disks_by_vendor_model_type() {
@@ -3475,6 +3456,10 @@ emit "if [ -f /etc/mdadm.conf ]"
 emit "then"
 emit "  mdadm -A -s"
 emit "display_mem_usage"
+# create nodes if there is a partition within RAID device
+emit "for i in \`cat /proc/mdstat | grep active | cut -d' ' -f1\`; do"
+emit "    block_part_mknod \$i"
+emit "done"
 emit "fi"
 
 if [ -n "$vg_list" ]; then
@@ -3617,7 +3602,6 @@ emit "mount -t proc proc /sysroot/proc"
 emit "umount /sys"
 emit "mount -t sysfs sysfs /sysroot/sys"
 emit "mount -o bind /dev /sysroot/dev"
-emit "load_selinux_policy /sysroot"
 
 emit "display_mem_usage"
 emit "touch /sysroot/fastboot"
@@ -4100,12 +4084,10 @@ if [ -n "$KDUMP_CONFIG_FILE" ]; then
                     emit "  VMCORE=/mnt/$SAVE_PATH/127.0.0.1-\$DATE/vmcore"
                     emit "  export VMCORE"
                     emit "  display_mem_usage"
-                    make_trace_mem "  Before selinux policy is loaded" 1:shortmem 2+:mem 3+:slab
+                    make_trace_mem "  Before dumping vmcore" 1:shortmem 2+:mem 3+:slab
                     if [ "$CORE_COLLECTOR" == "cp" ]; then
                         emit "  monitor_cp_progress \$VMCORE-incomplete &"
                     fi
-		    emit "  load_selinux_policy /mnt"
-                    make_trace_mem "  Before dumping vmcore" 1:shortmem 2+:mem 3+:slab
                     # Save vmcore-dmesg
                     emit "  DMESG_PATH=/mnt/$SAVE_PATH/127.0.0.1-\$DATE/"
                     emit "  save_vmcore_dmesg_fs ${DMESG_COLLECTOR} \${DMESG_PATH}"
@@ -4122,7 +4104,6 @@ if [ -n "$KDUMP_CONFIG_FILE" ]; then
                     if [ -x "$KDUMP_POST" ]; then
                         emit "  $KDUMP_POST \$exitcode"
                     fi
-                    emit "  [ -e /mnt/selinux ] && umount /mnt/selinux"
                     emit "  umount /mnt"
                     emit "  if [ \$exitcode == 0 ]"
                     emit "  then"

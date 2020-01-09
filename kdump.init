@@ -453,6 +453,11 @@ function load_kdump()
 			acpi_addr=$(awk -F'=' '/^ACPI=/ {print $2}' /sys/firmware/efi/systab)
 		fi
 		KDUMP_COMMANDLINE="$KDUMP_COMMANDLINE noefi acpi_rsdp=$acpi_addr"
+
+		smbios_addr=$(awk -F'=' '/^SMBIOS=/ {print $2}' /sys/firmware/efi/systab)
+		if [ -n "$smbios_addr" ]; then
+			KDUMP_COMMANDLINE="$KDUMP_COMMANDLINE efi_smbios_addr=$smbios_addr"
+		fi
 	fi
 
 	if echo "$KDUMP_COMMANDLINE_APPEND" | grep -q nr_cpus;

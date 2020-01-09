@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.0 
-Release: 300%{?dist}.2
+Release: 307%{?dist}
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -164,6 +164,7 @@ Patch675: kexec-tools-2.0.0-makedumpfile-code-changes-to-satisfy-the-coverity-sc
 Patch676: kexec-tools-2.0.0-makedumpfile-remove-the-double_free-of-sph.patch
 Patch677: kexec-tools-2.0.0-vmcore-dmesg-Collect-full-dmesg-regardless-of-logged.patch
 Patch678: kexec-tools-2.0.0-makedumpfile-Use-file-offset-in-initialize_mmap.patch
+Patch679: kexec-tools-2.0.0-do-not-pass-efi-boot-data.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -286,6 +287,7 @@ tar -z -x -v -f %{SOURCE9}
 %patch676 -p1
 %patch677 -p1
 %patch678 -p1
+%patch679 -p1
 
 tar -z -x -v -f %{SOURCE13}
 tar -z -x -v -f %{SOURCE17}
@@ -503,12 +505,32 @@ done
 %endif
 
 %changelog
-* Fri Dec 16 2016 Baoquan He <bhe@redhat.com> - 2.0.0-300.2
-mkdumprd: Allow findmodule() to add dependency for lsmod output, resolves bug 1403699
-mkdumprd: Kill useless code in moduledep(), resolves bug 1403699
+* Fri Jan 20 2017 Baoquan He <bhe@redhat.com> - 2.0.0-307
+- mkdumprd: add mdmon binary for raid1 support, resolves bug 1404263
 
-* Wed Sep 14 2016 Baoquan He <bhe@redhat.com> - 2.0.0-300.1
-- mkdumprd: skip logical interfaces for bridge, resolves bug 1375890
+* Tue Jan 10 2017 Baoquan He <bhe@redhat.com> - 2.0.0-306
+- mkdumprd: fix env for mdadm, resolves bug 1404263
+- mkdumprd: create node for partition within RAID device, resolves bug 1404263
+- mkdumprd: refactor block_mknod(), resolves bug 1404263
+- uefi: Pass efi_smbios_addr to 2nd kernel, resolves bug 1404552
+
+* Fri Dec 02 2016 Baoquan He <bhe@redhat.com> - 2.0.0-305
+- kexec-tools/x86: do not pass efi boot data, resolves bug 1396377
+
+* Fri Oct 14 2016 Baoquan He <bhe@redhat.com> - 2.0.0-304
+- mkdumprd: pass the value of DEV_ID to kdump, resolves bug 1366513
+
+* Fri Oct 14 2016 Baoquan He <bhe@redhat.com> - 2.0.0-303
+- mkdumprd: Remove load_selinux_policy script, resolves bug 1323086
+- mkdumprd: pass the value of DEV_ID to kdump, resolves bug 1322802
+
+* Wed Sep 14 2016 Baoquan He <bhe@redhat.com> - 2.0.0-302
+- mkdumprd: Pack kdump.conf into kdump initramfs, resolves bug 1038508
+
+* Fri Aug 26 2016 Baoquan He <bhe@redhat.com> - 2.0.0-301
+- mkdumprd: Allow findmodule() to add dependency for lsmod output, resolves bug 1343282
+- mkdumprd: Kill useless code in moduledep(), resolves bug 1343282
+- mkdumprd: skip logical interfaces for bridge, resolves bug 1356615
 
 * Tue Mar 29 2016 Baoquan He <bhe@redhat.com> - 2.0.0-300
 - fadump/ppc64: only check for dump target paths fadump supports, resolves bug 1254923
