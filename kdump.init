@@ -157,6 +157,27 @@ function append_cmdline()
     echo $cmdline
 }
 
+# This function fix root=by-path, since we can not parse it in the 2nd kernel
+function fix_cmdline_rootdev()
+{
+	local cmdline=$1
+	local rootdev
+	local rootuuid
+	local is_bypath
+	rootdev=$(echo $cmdline | sed 's/^.*root=//' | cut -d" " -f1)
+	if [ -n "$rootdev" ]; then
+		is_bypath=$(echo $rootdev| grep by-path)
+		if [ -n "$is_bypath" ]; then
+			cmdline=`remove_cmdline_param "$cmdline" root`
+			rootuuid=`findmnt -k -f -n -r -o UUID /`
+			if [ -n "$rootuuid" ]; then
+				cmdline="$cmdline root=UUID=$rootuuid"
+			fi
+		fi
+	fi
+	echo $cmdline
+}
+
 # This function performs a series of edits on the command line
 function prepare_cmdline()
 {
@@ -167,6 +188,7 @@ function prepare_cmdline()
 		cmdline=${KDUMP_COMMANDLINE}
 	fi
 	cmdline=`remove_cmdline_param "$cmdline" crashkernel mem hugepages hugepagesz`
+	cmdline=$(fix_cmdline_rootdev "$cmdline")
 	cmdline="${cmdline} ${KDUMP_COMMANDLINE_APPEND}"
 	avoid_cdrom_drive
 	KDUMP_COMMANDLINE="${KDUMP_COMMANDLINE} ${KDUMP_IDE_NOPROBE_COMMANDLINE}"

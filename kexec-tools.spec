@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.0 
-Release: 307%{?dist}.1
+Release: 310%{?dist}
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -505,8 +505,15 @@ done
 %endif
 
 %changelog
-* Tue Sep 26 2017 Baoquan He <bhe@redhat.com> - 2.0.0-307.1
-- Improve 'cpu add' udev rules, resolves bug 1494022
+* Thu Apr 12 2018 Pingfan Liu <piliu@redhat.com> - 2.0.0-310
+- kdump.init: replace root=by-path in the 2nd kernel cmdline with root=uuid
+
+* Mon Feb 26 2018 Pingfan Liu <piliu@redhat.com> - 2.0.0-309
+- mkdumprd: Fix mkdumprd fail when cluster node uses ipv6
+- mkdumprd: fix the search criteria for detection of RAID devices
+
+* Tue Sep 26 2017 Baoquan He <bhe@redhat.com> - 2.0.0-308
+- Improve 'cpu add' udev rules, resolves bug 1467772
 
 * Fri Jan 20 2017 Baoquan He <bhe@redhat.com> - 2.0.0-307
 - mkdumprd: add mdmon binary for raid1 support, resolves bug 1404263

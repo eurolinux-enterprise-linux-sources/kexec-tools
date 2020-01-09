@@ -807,7 +807,7 @@ findstoragedriver () {
                 continue ;;
             *) handleddevices="$handleddevices $device" ;;
         esac
-        echo $device | grep -q "md[0-9]\+"
+       grep -q "$device" /proc/mdstat
         if [ $? == 0 ]; then
             vecho "Found RAID component $device"
             handleraid "$device"
@@ -1643,6 +1643,16 @@ setup_cluster_nodes_and_options()
         for node in ${nodelist}; do
             addr=`getent ahostsv4 $node | head -n 1 | cut -d' ' -f1`
             netdev=`/sbin/ip route get to $addr 2>&1`
+
+            if [ -z "$addr" ]; then
+                addr6=`getent ahostsv6 $node | head -n 1 | cut -d' ' -f1`
+                if [ ! -z "$addr6" ]; then
+                    error "WARNING: Cluster is using IPv6 for communication, IPv6 is not supported in RHEL6 kdump, system might be fenced while saving vmcore resulting in incomplete vmcore";
+                else
+                    error "WARNING: Unable to find IP of cluster node, system might get fenced while saving vmcore resulting in incomplete vmcore";
+                fi
+                return 1
+            fi
 
             if echo $netdev | grep -q ^local; then
                 continue
