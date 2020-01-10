@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.15
-Release: 21%{?dist}
+Release: 21%{?dist}.3
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -116,6 +116,8 @@ Patch719: kexec-tools-2.0.15-makedumpfile-Use-integer-arithmetics-for-th.patch
 Patch720: kexec-tools-2.0.15-makedumpfile-Use-monotonic-clock-to-calculate-ETA-and-s.patch
 Patch721: kexec-tools-2.0.15-makedumpfile-Check-if-clock_gettime-requires-lrt.patch
 Patch722: kexec-tools-2.0.15-makedumpfile-when-refiltering-initialize-refiltered-bitm.patch
+Patch723: kexec-tools-2.0.15-makedumpfile-Prepare-paddr_to_vaddr-for-arch-specific-p2v-c.patch
+Patch724: kexec-tools-2.0.15-makedumpfile-arm64-restore-info-page_offset-and-implement-paddr_t.patch
 
 
 #
@@ -184,6 +186,8 @@ tar -z -x -v -f %{SOURCE25}
 %patch720 -p1
 %patch721 -p1
 %patch722 -p1
+%patch723 -p1
+%patch724 -p1
 
 
 %ifarch ppc
@@ -425,6 +429,16 @@ done
 %doc
 
 %changelog
+* Fri Mar 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.3
+- makedumpfile/arm64: Fix 'info->page_offset' calculation (use correct
+  bug number)
+
+* Fri Mar 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.2
+- makedumpfile/arm64: Fix 'info->page_offset' calculation
+
+* Tue Mar 12 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.1
+- mkdumprd: refine regex on dropping mount options
+
 * Thu Aug 30 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-21
 - kexec/ppc64: add support to parse ibm, dynamic-memory-v2 
 

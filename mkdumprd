@@ -100,11 +100,11 @@ to_mount() {
     _fstype=$(findmnt -k -f -n -r -o FSTYPE $_dev)
     [[ -e /etc/fstab ]] && _options=$(findmnt --fstab -f -n -r -o OPTIONS $_dev)
     [ -z "$_options" ] && _options=$(findmnt -k -f -n -r -o OPTIONS $_dev)
+    #mount fs target as rw in 2nd kernel
+    _options=$(echo $_options | sed 's/\(^\|,\)ro\($\|,\)/\1rw\2/g')
     # with 'noauto' in fstab nfs and non-root disk mount will fail in 2nd
     # kernel, filter it out here.
-    _options=$(echo $_options | sed 's/\bnoauto\b//')
-    #mount fs target as rw in 2nd kernel
-    _options=$(echo $_options | sed 's/\bro\b/rw/')
+    _options=$(echo $_options | sed 's/\(^\|,\)noauto\($\|,\)/\1/g')
 
     _mntopts="$_target $_fstype $_options"
     #for non-nfs _dev converting to use udev persistent name

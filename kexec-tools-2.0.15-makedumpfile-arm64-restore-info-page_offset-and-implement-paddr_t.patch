@@ -1,0 +1,176 @@
+From 91dc4cab62568605a274dd2260e863df2ade0230 Mon Sep 17 00:00:00 2001
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Thu, 27 Dec 2018 15:26:16 +0530
+Subject: makedumpfile/arm64: Fix 'info->page_offset' calculation
+
+This patch is a partial backport of the makedumpfile commit
+bc8b3bbf41580723435d5d4c6da17db3c9e5ad6d.
+
+Since the upstream makedumpfile implementation had intermediate patches
+applied which eased 'page_offset' calculation for arm64 arch, but these
+were reverted via bc8b3bbf41580723435d5d4c6da17db3c9e5ad6d.
+
+So, its not very useful to backport all those intermediate patches.
+
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ arch/arm64.c   | 75 ++++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ makedumpfile.c |  6 +++++
+ makedumpfile.h |  7 +++++-
+ 3 files changed, 82 insertions(+), 6 deletions(-)
+
+diff --git a/makedumpfile-1.6.2/arch/arm64.c b/makedumpfile-1.6.2/arch/arm64.c
+index fe49d408186e..491010846f8e 100644
+--- a/makedumpfile-1.6.2/arch/arm64.c
++++ b/makedumpfile-1.6.2/arch/arm64.c
+@@ -168,11 +168,76 @@ get_kvbase_arm64(void)
+ int
+ get_phys_base_arm64(void)
+ {
+-	info->phys_base = NUMBER(PHYS_OFFSET);
++	int i;
++	unsigned long long phys_start;
++	unsigned long long virt_start;
++
++	if (NUMBER(PHYS_OFFSET) != NOT_FOUND_NUMBER) {
++		info->phys_base = NUMBER(PHYS_OFFSET);
++		DEBUG_MSG("phys_base    : %lx (vmcoreinfo)\n",
++				info->phys_base);
++		return TRUE;
++	}
+
+-	DEBUG_MSG("phys_base    : %lx\n", info->phys_base);
++	if (get_num_pt_loads() && PAGE_OFFSET) {
++		for (i = 0;
++		    get_pt_load(i, &phys_start, NULL, &virt_start, NULL);
++		    i++) {
++			if (virt_start != NOT_KV_ADDR
++			    && virt_start >= PAGE_OFFSET
++			    && phys_start != NOT_PADDR) {
++				info->phys_base = phys_start -
++					(virt_start & ~PAGE_OFFSET);
++				DEBUG_MSG("phys_base    : %lx (pt_load)\n",
++						info->phys_base);
++				return TRUE;
++			}
++		}
++	}
+
+-	return TRUE;
++	ERRMSG("Cannot determine phys_base\n");
++	return FALSE;
++}
++
++unsigned long
++get_kaslr_offset_arm64(unsigned long vaddr)
++{
++	unsigned int i;
++	char buf[BUFSIZE_FGETS], *endp;
++
++	if (!info->kaslr_offset && info->file_vmcoreinfo) {
++		if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
++			ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
++					info->name_vmcoreinfo, strerror(errno));
++			return FALSE;
++		}
++
++		while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
++			i = strlen(buf);
++			if (!i)
++				break;
++			if (buf[i - 1] == '\n')
++				buf[i - 1] = '\0';
++			if (strncmp(buf, STR_KERNELOFFSET,
++					strlen(STR_KERNELOFFSET)) == 0) {
++				info->kaslr_offset =
++					strtoul(buf+strlen(STR_KERNELOFFSET),&endp,16);
++				DEBUG_MSG("info->kaslr_offset: %lx\n", info->kaslr_offset);
++			}
++		}
++	}
++
++	if (vaddr >= __START_KERNEL_map &&
++			vaddr < __START_KERNEL_map + info->kaslr_offset) {
++		DEBUG_MSG("info->kaslr_offset: %lx\n", info->kaslr_offset);
++		return info->kaslr_offset;
++	} else {
++		/*
++		 * TODO: we need to check if it is vmalloc/vmmemmap/module
++		 * address, we will have different offset
++		 */
++		return 0;
++	}
+ }
+
+ ulong
+@@ -285,8 +350,8 @@ get_versiondep_info_arm64(void)
+
+	info->page_offset = (0xffffffffffffffffUL) << (va_bits - 1);
+
+-	DEBUG_MSG("page_offset=%lx, va_bits=%d\n", info->page_offset,
+-			va_bits);
++	DEBUG_MSG("va_bits      : %d\n", va_bits);
++	DEBUG_MSG("page_offset  : %lx\n", info->page_offset);
+
+	return TRUE;
+ }
+diff --git a/makedumpfile-1.6.2/makedumpfile.c b/makedumpfile-1.6.2/makedumpfile.c
+index c9634cd42858..78ebced33e6a 100644
+--- a/makedumpfile-1.6.2/makedumpfile.c
++++ b/makedumpfile-1.6.2/makedumpfile.c
+@@ -2339,6 +2339,7 @@ read_vmcoreinfo_basic_info(void)
+			break;
+		if (buf[i - 1] == '\n')
+			buf[i - 1] = '\0';
++
+		if (strncmp(buf, STR_OSRELEASE, strlen(STR_OSRELEASE)) == 0) {
+			get_release = TRUE;
+			/* if the release have been stored, skip this time. */
+@@ -2382,6 +2383,7 @@ read_vmcoreinfo_basic_info(void)
+		    strlen(STR_CONFIG_PGTABLE_4)) == 0)
+			vt.mem_flags |= MEMORY_PAGETABLE_4L;
+	}
++
+	if (!get_release || !info->page_size) {
+		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
+		return FALSE;
+@@ -11084,6 +11086,10 @@ int show_mem_usage(void)
+	if (!get_page_offset())
+		return FALSE;
+
++	/* paddr_to_vaddr() on arm64 needs phys_base. */
++	if (!get_phys_base())
++		return FALSE;
++
+	if (!get_sys_kernel_vmcoreinfo(&vmcoreinfo_addr, &vmcoreinfo_len))
+		return FALSE;
+
+diff --git a/makedumpfile-1.6.2/makedumpfile.h b/makedumpfile-1.6.2/makedumpfile.h
+index 010a9ce302bd..177805935b71 100644
+--- a/makedumpfile-1.6.2/makedumpfile.h
++++ b/makedumpfile-1.6.2/makedumpfile.h
+@@ -529,6 +529,8 @@ do { \
+ #ifdef __aarch64__
+ unsigned long get_kvbase_arm64(void);
+ #define KVBASE			get_kvbase_arm64()
++#define __START_KERNEL_map	(0xffffffff80000000UL)
++
+ #endif /* aarch64 */
+
+ #ifdef __arm__
+@@ -938,9 +940,12 @@ unsigned long long vaddr_to_paddr_arm64(unsigned long vaddr);
+ int get_versiondep_info_arm64(void);
+ int get_xen_basic_info_arm64(void);
+ int get_xen_info_arm64(void);
++unsigned long get_kaslr_offset_arm64(unsigned long vaddr);
++#define paddr_to_vaddr_arm64(X) (((X) - info->phys_base) | PAGE_OFFSET)
++
+ #define find_vmemmap()		stub_false()
+ #define vaddr_to_paddr(X)	vaddr_to_paddr_arm64(X)
+-#define paddr_to_vaddr(X)	paddr_to_vaddr_general(X)
++#define paddr_to_vaddr(X)	paddr_to_vaddr_arm64(X)
+ #define get_phys_base()		get_phys_base_arm64()
+ #define get_machdep_info()	get_machdep_info_arm64()
+ #define get_versiondep_info()	get_versiondep_info_arm64()
+--
+2.7.4
