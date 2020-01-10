@@ -1,0 +1,55 @@
+From a02f5f078ce635dd1633dab70869306b0a62e2e2 Mon Sep 17 00:00:00 2001
+From: Pratyush Anand <panand@redhat.com>
+Date: Thu, 17 Aug 2017 12:47:13 +0900
+Subject: [PATCH v2] Fix SECTION_MAP_MASK for kernel >= v.13
+
+* Required for kernel 4.13
+
+commit 2d070eab2e82 "mm: consider zone which is not fully populated to
+have holes" added a new flag SECTION_IS_ONLINE and therefore
+SECTION_MAP_MASK has been changed. We are not able to find correct
+mem_map in makedumpfile for kernel version v4.13-rc1 and onward because
+of the above kernel change.
+
+This patch fixes the MASK value keeping the code backward compatible
+
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ makedumpfile.c | 5 ++++-
+ makedumpfile.h | 4 +++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/makedumpfile-1.6.2/makedumpfile.c b/makedumpfile-1.6.2/makedumpfile.c
+index 8af0c9d..5096319 100644
+--- a/makedumpfile-1.6.2/makedumpfile.c
++++ b/makedumpfile-1.6.2/makedumpfile.c
+@@ -3304,7 +3304,10 @@ section_mem_map_addr(unsigned long addr)
+ 		return NOT_KV_ADDR;
+ 	}
+ 	map = ULONG(mem_section + OFFSET(mem_section.section_mem_map));
+-	map &= SECTION_MAP_MASK;
++	if (info->kernel_version < KERNEL_VERSION(4, 13, 0))
++		map &= SECTION_MAP_MASK_4_12;
++	else
++		map &= SECTION_MAP_MASK;
+ 	free(mem_section);
+ 
+ 	return map;
+diff --git a/makedumpfile-1.6.2/makedumpfile.h b/makedumpfile-1.6.2/makedumpfile.h
+index b0cdd02..6f188e4 100644
+--- a/makedumpfile-1.6.2/makedumpfile.h
++++ b/makedumpfile-1.6.2/makedumpfile.h
+@@ -183,7 +183,9 @@ isAnon(unsigned long mapping)
+ #define SECTIONS_PER_ROOT()	(info->sections_per_root)
+ #define SECTION_ROOT_MASK()	(SECTIONS_PER_ROOT() - 1)
+ #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT())
+-#define SECTION_MAP_LAST_BIT	(1UL<<2)
++#define SECTION_IS_ONLINE	(1UL<<2)
++#define SECTION_MAP_LAST_BIT	(1UL<<3)
++#define SECTION_MAP_MASK_4_12	(~(SECTION_IS_ONLINE-1))
+ #define SECTION_MAP_MASK	(~(SECTION_MAP_LAST_BIT-1))
+ #define NR_SECTION_ROOTS()	divideup(num_section, SECTIONS_PER_ROOT())
+ #define SECTION_NR_TO_PFN(sec)	((sec) << PFN_SECTION_SHIFT())
+-- 
+2.7.4
+

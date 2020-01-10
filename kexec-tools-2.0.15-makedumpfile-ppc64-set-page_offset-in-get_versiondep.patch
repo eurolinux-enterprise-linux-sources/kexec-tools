@@ -1,0 +1,30 @@
+From d0f59cdf7f30e4c2e533004c32c1f1979ae86371 Mon Sep 17 00:00:00 2001
+From: Pingfan Liu <piliu@redhat.com>
+Date: Mon, 21 Aug 2017 12:24:13 +0900
+Subject: [PATCH 1/2] [PATCH v2 1/2] ppc64: set page_offset in
+ get_versiondep_info_ppc64()
+
+Envalue info->page_offset in get_versiondep_info_ppc64() is a little
+misleading. But since show_mem_usage->get_page_offset->get_versiondep_info
+needs to get this info, so initialize it in get_versiondep_info_ppc64().
+
+Signed-off-by: Pingfan Liu <piliu@redhat.com>
+---
+ arch/ppc64.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/makedumpfile-1.6.2/arch/ppc64.c b/makedumpfile-1.6.2/arch/ppc64.c
+index 6aeab7e..3fd6002 100644
+--- a/makedumpfile-1.6.2/arch/ppc64.c
++++ b/makedumpfile-1.6.2/arch/ppc64.c
+@@ -576,6 +576,7 @@ get_versiondep_info_ppc64()
+ 		ERRMSG("Can't initialize for vmalloc translation\n");
+ 		return FALSE;
+ 	}
++	info->page_offset = __PAGE_OFFSET;
+ 
+ 	return TRUE;
+ }
+-- 
+2.7.4
+

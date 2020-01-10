@@ -1,0 +1,71 @@
+From dc28bfc3213960b549bcc70f0d5379a6222d2c60 Mon Sep 17 00:00:00 2001
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Wed, 13 Sep 2017 05:04:00 +0900
+Subject: [PATCH] [PATCH v2] book3s/ppc64: Lower the max real address to 53
+ bits for kernels >= v4.11
+
+* Required for kernel 4.11
+
+Kernel commit 2f18d533757da3899f4bedab0b2c051b080079dc lowered the
+max real address on ppc64 to 53 bits.
+
+Make similar changes in makedumpfile (on basis of the underlying kernel
+version), without which the makedumpfile will fail to create a dumpfile
+and instead throw a SEGV fault as shown below on kernels >= v4.11:
+
+ # makedumpfile --split -d 31 -x vmlinux vmcore dumpfile_{1,2,3} 2>&1
+
+ The kernel version is not supported.
+ The makedumpfile operation may be incomplete.
+ [ 1196.252094] makedumpfile[2367]: unhandled signal 11 at
+ 00000100f7011ca8 nip 000000001001eecc lr 000000001001f3c0 code 30001
+ Segmentation fault
+
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ arch/ppc64.c   | 8 +++++++-
+ makedumpfile.h | 5 +++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/makedumpfile-1.6.2/arch/ppc64.c b/makedumpfile-1.6.2/arch/ppc64.c
+index bacac778f73c..2f5a0daa16b2 100644
+--- a/makedumpfile-1.6.2/arch/ppc64.c
++++ b/makedumpfile-1.6.2/arch/ppc64.c
+@@ -307,11 +307,17 @@ ppc64_vmalloc_init(void)
+ 	}
+ 
+ 	info->pte_rpn_mask = PTE_RPN_MASK_DEFAULT;
+-	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
++	if ((info->kernel_version >= KERNEL_VERSION(4, 6, 0)) &&
++	    (info->kernel_version < KERNEL_VERSION(4, 11, 0))) {
+ 		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_6;
+ 		info->pte_rpn_shift = PTE_RPN_SHIFT_L4_4_6;
+ 	}
+ 
++	if (info->kernel_version >= KERNEL_VERSION(4, 11, 0)) {
++		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_11;
++		info->pte_rpn_shift = PTE_RPN_SHIFT_L4_4_11;
++	}
++
+ 	/*
+ 	 * Compute ptrs per each level
+ 	 */
+diff --git a/makedumpfile-1.6.2/makedumpfile.h b/makedumpfile-1.6.2/makedumpfile.h
+index 7d81bbcf2234..f4ba02d11f09 100644
+--- a/makedumpfile-1.6.2/makedumpfile.h
++++ b/makedumpfile-1.6.2/makedumpfile.h
+@@ -692,6 +692,11 @@ unsigned long get_kvbase_arm64(void);
+ #define PUD_MASKED_BITS_4_7  0xc0000000000000ffUL
+ #define PMD_MASKED_BITS_4_7  0xc0000000000000ffUL
+ 
++#define PTE_RPN_SIZE_L4_4_11  53
++#define PTE_RPN_MASK_L4_4_11   \
++	(((1UL << PTE_RPN_SIZE_L4_4_11) - 1) & ~((1UL << info->page_shift) - 1))
++#define PTE_RPN_SHIFT_L4_4_11  info->page_shift
++
+ /*
+  * Supported MMU types
+  */
+-- 
+2.7.4
+

@@ -1,0 +1,68 @@
+From d6d5b443c82471818d43cb87c9280a0252e763e7 Mon Sep 17 00:00:00 2001
+From: Takao Indoh <indou.takao@jp.fujitsu.com>
+Date: Thu, 26 Oct 2017 20:32:48 +0900
+Subject: [PATCH 1/4] [PATCH v3 1/4] Support symbol __cpu_online_mask
+
+In the upstream kernel, by commit 5aec01b83 cpu_online_mask was replaced
+with macros and new variables __cpu_online_mask was added instead of it.
+Sadump uses cpu_online_mask to check the cpu was online or not,
+therefore it also need __cpu_online_mask symbol for this in the latest
+kernel.
+
+Signed-off-by: Takao Indoh <indou.takao@jp.fujitsu.com>
+Signed-off-by: HATAYAMA Daisuke <d.hatayama@jp.fujitsu.com>
+---
+ makedumpfile.c | 9 +++++++--
+ makedumpfile.h | 1 +
+ sadump_info.c  | 3 ++-
+ 3 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/makedumpfile.c b/makedumpfile.c
+index 567ac5dc1f9e..5f2ca7d0fbc8 100644
+--- a/makedumpfile-1.6.2/makedumpfile.c
++++ b/makedumpfile-1.6.2/makedumpfile.c
+@@ -1519,8 +1519,13 @@ get_symbol_info(void)
+ 	SYMBOL_INIT(__per_cpu_load, "__per_cpu_load");
+ 	SYMBOL_INIT(__per_cpu_offset, "__per_cpu_offset");
+ 	SYMBOL_INIT(cpu_online_mask, "cpu_online_mask");
+-	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL)
+-		SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
++	SYMBOL_INIT(__cpu_online_mask, "__cpu_online_mask");
++	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL) {
++		if (SYMBOL(__cpu_online_mask) == NOT_FOUND_SYMBOL)
++			SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
++		else
++			SYMBOL_INIT(cpu_online_mask, "__cpu_online_mask");
++	}
+ 	SYMBOL_INIT(kexec_crash_image, "kexec_crash_image");
+ 	SYMBOL_INIT(node_remap_start_vaddr, "node_remap_start_vaddr");
+ 	SYMBOL_INIT(node_remap_end_vaddr, "node_remap_end_vaddr");
+diff --git a/makedumpfile.h b/makedumpfile.h
+index f4ba02d11f09..704a6bc2f8f4 100644
+--- a/makedumpfile-1.6.2/makedumpfile.h
++++ b/makedumpfile-1.6.2/makedumpfile.h
+@@ -1596,6 +1596,7 @@ struct symbol_table {
+ 	unsigned long long	__per_cpu_offset;
+ 	unsigned long long	__per_cpu_load;
+ 	unsigned long long	cpu_online_mask;
++	unsigned long long	__cpu_online_mask;
+ 	unsigned long long	kexec_crash_image;
+ 
+ 	/*
+diff --git a/sadump_info.c b/sadump_info.c
+index 257f1be5e686..7dd22e704234 100644
+--- a/makedumpfile-1.6.2/sadump_info.c
++++ b/makedumpfile-1.6.2/sadump_info.c
+@@ -953,7 +953,8 @@ cpu_online_mask_init(void)
+ 		return FALSE;
+ 	}
+ 
+-	if (SIZE(cpumask) == NOT_FOUND_STRUCTURE)
++	if ((SIZE(cpumask) == NOT_FOUND_STRUCTURE) ||
++	    (SYMBOL(__cpu_online_mask) != NOT_FOUND_SYMBOL))
+ 		cpu_online_mask_addr = SYMBOL(cpu_online_mask);
+ 
+ 	else {
+-- 
+2.5.5
+

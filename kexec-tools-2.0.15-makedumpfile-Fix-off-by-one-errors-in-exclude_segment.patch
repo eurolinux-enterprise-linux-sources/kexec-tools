@@ -1,0 +1,75 @@
+From 590f35e773dcd51a750b9a181863660a25b66f01 Mon Sep 17 00:00:00 2001
+From: Petr Tesarik <ptesarik@suse.com>
+Date: Fri, 19 Jan 2018 20:46:19 +0900
+Subject: [PATCH 1/2] [PATCH 1/2] Fix off-by-one errors in exclude_segment()
+
+The crashed reserved memory end offset is the last address within
+range, whereas the end offset in the pt_loads[] denotes the first
+address past the range. This has caused a number of off-by-one
+errors in exclude_segment().
+
+First, let's unify the meaning of "end" to be the first out-of-range
+address, i.e. start + size. Thanks to that, no +1 or -1 adjustments
+are needed in exclude_segment().
+
+Second, since the value read from /proc/iomem is the last address
+within range, add one when passing it as an argument to
+exclude_segment(). This is now the only adjustment by one.
+
+Signed-off-by: Petr Tesarik <ptesarik@suse.com>
+Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ elf_info.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/makedumpfile-1.6.2/elf_info.c b/makedumpfile-1.6.2/elf_info.c
+index 69b1719b020f..1eaddd968826 100644
+--- a/makedumpfile-1.6.2/elf_info.c
++++ b/makedumpfile-1.6.2/elf_info.c
+@@ -820,26 +820,26 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
+ 		if (kvstart <  vend && kvend > vstart) {
+ 			if (kvstart != vstart && kvend != vend) {
+ 				/* Split load segment */
+-				temp_seg.phys_start = end + 1;
++				temp_seg.phys_start = end;
+ 				temp_seg.phys_end = (*pt_loads)[i].phys_end;
+-				temp_seg.virt_start = kvend + 1;
++				temp_seg.virt_start = kvend;
+ 				temp_seg.virt_end = vend;
+ 				temp_seg.file_offset = (*pt_loads)[i].file_offset
+ 					+ temp_seg.virt_start - (*pt_loads)[i].virt_start;
+ 				temp_seg.file_size = temp_seg.phys_end
+ 					- temp_seg.phys_start;
+ 
+-				(*pt_loads)[i].virt_end = kvstart - 1;
+-				(*pt_loads)[i].phys_end =  start - 1;
++				(*pt_loads)[i].virt_end = kvstart;
++				(*pt_loads)[i].phys_end =  start;
+ 				(*pt_loads)[i].file_size -= temp_seg.file_size;
+ 
+ 				tidx = i+1;
+ 			} else if (kvstart != vstart) {
+-				(*pt_loads)[i].phys_end = start - 1;
+-				(*pt_loads)[i].virt_end = kvstart - 1;
++				(*pt_loads)[i].phys_end = start;
++				(*pt_loads)[i].virt_end = kvstart;
+ 			} else {
+-				(*pt_loads)[i].phys_start = end + 1;
+-				(*pt_loads)[i].virt_start = kvend + 1;
++				(*pt_loads)[i].phys_start = end;
++				(*pt_loads)[i].virt_start = kvend;
+ 			}
+ 			(*pt_loads)[i].file_size -= (end -start);
+ 		}
+@@ -917,7 +917,7 @@ int get_kcore_dump_loads(void)
+ 
+ 	for (i = 0; i < crash_reserved_mem_nr; i++)	{
+ 		exclude_segment(&pt_loads, &num_pt_loads,
+-				crash_reserved_mem[i].start, crash_reserved_mem[i].end);
++				crash_reserved_mem[i].start, crash_reserved_mem[i].end + 1);
+ 	}
+ 
+ 	max_file_offset = 0;
+-- 
+2.7.4
+

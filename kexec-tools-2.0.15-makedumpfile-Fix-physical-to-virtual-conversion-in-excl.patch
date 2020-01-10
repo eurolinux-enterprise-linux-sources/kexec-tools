@@ -1,0 +1,35 @@
+From 6c1bf2a029be0615089f55d815fdb78f6e06e06a Mon Sep 17 00:00:00 2001
+From: Petr Tesarik <ptesarik@suse.com>
+Date: Fri, 19 Jan 2018 20:46:17 +0900
+Subject: [PATCH 2/2] [PATCH 2/2] Fix physical-to-virtual conversion in
+ exclude_segment()
+
+With kaslr enabled, PAGE_OFFSET may no longer be aligned to allow
+calculation using bitwise OR. My fix follows the same idea as
+Baoquan's commit 4c53423b995463067fbbd394e724b4d1d6ea3d62 for
+set_kcore_vmcoreinfo, i.e. use arithmetic addition instead.
+
+Signed-off-by: Petr Tesarik <ptesarik@suse.com>
+Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ elf_info.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/makedumpfile-1.6.2/elf_info.c b/makedumpfile-1.6.2/elf_info.c
+index 1eaddd968826..711601a170c7 100644
+--- a/makedumpfile-1.6.2/elf_info.c
++++ b/makedumpfile-1.6.2/elf_info.c
+@@ -810,8 +810,8 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
+ 	int i, j, tidx = -1;
+ 	unsigned long long	vstart, vend, kvstart, kvend;
+ 	struct pt_load_segment temp_seg = {0};
+-	kvstart = (ulong)start | PAGE_OFFSET;
+-	kvend = (ulong)end | PAGE_OFFSET;
++	kvstart = (ulong)start + PAGE_OFFSET;
++	kvend = (ulong)end + PAGE_OFFSET;
+ 	unsigned long size;
+ 
+ 	for (i = 0; i < (*num_pt_loads); i++) {
+-- 
+2.7.4
+
