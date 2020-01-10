@@ -42,6 +42,9 @@ storage:
         hardware RAID (cciss, hpsa, megaraid_sas, mpt2sas, aacraid)
         SCSI/SATA disks
         iSCSI HBA (all offload)
+        hardware FCoE (qla2xxx, lpfc, bfa)
+        software FCoE (bnx2fc, fcoe/ixgbe) (Extra configuration required,
+            please read "Note on FCoE" section below)
 
 network:
         Hardware using kernel modules: (tg3, igb, ixgbe, sfc, e1000e, bna,
@@ -61,7 +64,6 @@ hypervisor:
 
 filesystem:
         ext[234]
-        btrfs
         xfs
         nfs
 
@@ -92,6 +94,9 @@ network:
         Infiniband (IB)
         vlan over bridge/team
 
+filesystem:
+        btrfs
+
 Unknown/tech-preview
 --------------------
 storage:
@@ -101,6 +106,21 @@ hypervisor:
         Hyper-V 2008
         Hyper-V 2012
 
+
+Note on FCoE
+=====================
+If you are trying to dump to a software FCoE target, you may encounter OOM
+issue, because some software FCoE requires more memory to work. In such case,
+you may need to increase the kdump reserved memory size in "crashkernel="
+kernel parameter.
+
+By default, RHEL systems have "crashkernel=auto" in kernel boot arguments.
+The auto reserved memory size is designed to balance the coverage of use cases
+and an acceptable memory overhead, so not every use case could fit in, software
+FCoE is one of the case.
+
+For hardware FCoE, kdump should work naturally as firmware will do the
+initialization job. The capture kernel and kdump tools will run just fine.
 
 Useful Links
 ============

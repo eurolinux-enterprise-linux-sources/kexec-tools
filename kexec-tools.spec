@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.15
-Release: 13%{?dist}.2
+Release: 21%{?dist}
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -25,7 +25,7 @@ Source21: kdump-in-cluster-environment.txt
 Source22: supported-kdump-targets.txt
 Source23: kdump-dep-generator.sh
 Source24: kdump-lib-initramfs.sh
-Source25: kdump-anaconda-addon-003-23-g80e78fb.tar.gz
+Source25: kdump-anaconda-addon-003-29-g4c517c5.tar.gz
 Source26: kdump.sysconfig.ppc64le
 Source27: kdump.sysconfig.aarch64
 Source28: kdumpctl.8
@@ -47,8 +47,8 @@ Requires(post): systemd-units
 Requires(preun): systemd-units
 Requires(postun): systemd-units
 Requires(pre): coreutils sed zlib 
-Requires: dracut >= 033-522
-Requires: dracut-network >= 033-522
+Requires: dracut >= 033-552
+Requires: dracut-network >= 033-552
 Requires: ethtool
 BuildRequires: zlib-devel zlib zlib-static elfutils-devel-static glib2-devel bzip2-devel ncurses-devel bison flex lzo-devel snappy-devel
 BuildRequires: pkgconfig intltool gettext 
@@ -81,6 +81,7 @@ Patch304: kexec-tools-2.0.15-ppc64-fix-leak-while-checking-for-cohere.patch
 Patch305: kexec-tools-2.0.15-makedumpfile-ppc64-get-the-info-of-mem-reserved-for-.patch
 Patch306: kexec-tools-2.0.15-makedumpfile-ppc64-set-page_offset-in-get_versiondep.patch
 
+
 #
 # Patches 401 through 500 are meant for s390 kexec-tools enablement
 #
@@ -94,7 +95,6 @@ Patch306: kexec-tools-2.0.15-makedumpfile-ppc64-set-page_offset-in-get_versionde
 #
 # Patches 701 onward are generic patches
 #
-Patch701: kexec-tools-2.0.3-disable-kexec-test.patch
 Patch702: kexec-tools-2.0.15-makedumpfile-Fix-SECTION_MAP_MASK-for-kernel-v.13.patch
 Patch703: kexec-tools-2.0.15-makedumpfile-Support-symbol-__cpu_online_mask.patch
 Patch704: kexec-tools-2.0.15-makedumpfile-Introduce-vtop4_x86_64_pagetable.patch
@@ -107,6 +107,15 @@ Patch710: kexec-tools-2.0.15-makedumpfile-Fix-physical-to-virtual-conversion-in-
 Patch711: kexec-tools-2.0.15-makedumpfile-sadump-Fix-a-problem-of-PTI-enabled-kernel.patch
 Patch712: kexec-tools-2.0.15-makedumpfile-PATCH-Support-newer-kernels.patch
 Patch713: kexec-tools-2.0.15-makedumpfile-fix-for-hugepages-filtering.patch
+Patch714: kexec-tools-2.0.15-makedumpfile-Add-a-new-helper-file-tools.c-that-provides-some-use.patch
+Patch715: kexec-tools-2.0.15-makedumpfile-arm64-Add-support-to-read-symbols-like-_stext-from-p.patch
+Patch716: kexec-tools-2.0.15-makedumpfile-Documentation-Update-documentation-regarding-mem-usa.patch
+Patch717: kexec-tools-2.0.15-makedumpfile-arm64-Fix-calculation-of-page_offset-in-case-we-are-.patch
+Patch718: kexec-tools-2.0.15-makedumpfile-Fix-array-index-out-of-bound-exception.patch
+Patch719: kexec-tools-2.0.15-makedumpfile-Use-integer-arithmetics-for-th.patch
+Patch720: kexec-tools-2.0.15-makedumpfile-Use-monotonic-clock-to-calculate-ETA-and-s.patch
+Patch721: kexec-tools-2.0.15-makedumpfile-Check-if-clock_gettime-requires-lrt.patch
+Patch722: kexec-tools-2.0.15-makedumpfile-when-refiltering-initialize-refiltered-bitm.patch
 
 
 #
@@ -154,7 +163,6 @@ tar -z -x -v -f %{SOURCE25}
 %patch304 -p1
 %patch305 -p1
 %patch306 -p1
-%patch701 -p1
 %patch702 -p1
 %patch703 -p1
 %patch704 -p1
@@ -167,6 +175,15 @@ tar -z -x -v -f %{SOURCE25}
 %patch711 -p1
 %patch712 -p1
 %patch713 -p1
+%patch714 -p1
+%patch715 -p1
+%patch716 -p1
+%patch717 -p1
+%patch718 -p1
+%patch719 -p1
+%patch720 -p1
+%patch721 -p1
+%patch722 -p1
 
 
 %ifarch ppc
@@ -210,7 +227,7 @@ make -C makedumpfile-1.6.2 LDFLAGS="-I../eppic/libeppic -L../eppic/libeppic" epp
 make -C kdump-anaconda-addon/po
 
 %install
-make install DESTDIR=$RPM_BUILD_ROOT
+mkdir -p -m755 $RPM_BUILD_ROOT/sbin
 mkdir -p -m755 $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 mkdir -p -m755 $RPM_BUILD_ROOT%{_localstatedir}/crash
 mkdir -p -m755 $RPM_BUILD_ROOT%{_mandir}/man8/
@@ -223,6 +240,11 @@ mkdir -p -m755 $RPM_BUILD_ROOT%{_bindir}
 mkdir -p -m755 $RPM_BUILD_ROOT%{_libdir}
 mkdir -p -m755 $RPM_BUILD_ROOT%{_prefix}/lib/kdump
 install -m 755 %{SOURCE1} $RPM_BUILD_ROOT%{_bindir}/kdumpctl
+
+install -m 755 build/sbin/kexec $RPM_BUILD_ROOT/sbin/kexec
+install -m 755 build/sbin/vmcore-dmesg $RPM_BUILD_ROOT/sbin/vmcore-dmesg
+install -m 644 build/man/man8/kexec.8  $RPM_BUILD_ROOT%{_mandir}/man8/
+install -m 644 build/man/man8/vmcore-dmesg.8  $RPM_BUILD_ROOT%{_mandir}/man8/
 
 SYSCONFIG=$RPM_SOURCE_DIR/kdump.sysconfig.%{_target_cpu}
 [ -f $SYSCONFIG ] || SYSCONFIG=$RPM_SOURCE_DIR/kdump.sysconfig.%{_arch}
@@ -354,7 +376,12 @@ do
 done
 
 %files
-/sbin/*
+/sbin/kexec
+/sbin/vmcore-dmesg
+%ifarch %{ix86} x86_64 ia64 ppc64 s390x ppc64le aarch64
+/sbin/makedumpfile
+%endif
+/sbin/mkdumprd
 %{_bindir}/*
 %{_datadir}/kdump
 %{_prefix}/lib/kdump
@@ -368,7 +395,13 @@ done
 %endif
 %{dracutlibdir}/modules.d/*
 %dir %{_localstatedir}/crash
-%{_mandir}/man8/*
+%{_mandir}/man8/kdumpctl.8.gz
+%{_mandir}/man8/kexec.8.gz
+%ifarch %{ix86} x86_64 ia64 ppc64 s390x ppc64le aarch64
+%{_mandir}/man8/makedumpfile.8.gz
+%endif
+%{_mandir}/man8/mkdumprd.8.gz
+%{_mandir}/man8/vmcore-dmesg.8.gz
 %{_mandir}/man5/*
 %{_unitdir}/kdump.service
 %{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
@@ -392,10 +425,49 @@ done
 %doc
 
 %changelog
-* Thu Aug 16 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-13.2
-- kdumpctl: Remove 'netroot' and 'iscsi initiator' entries from kdump cmdline
+* Thu Aug 30 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-21
+- kexec/ppc64: add support to parse ibm, dynamic-memory-v2 
 
-* Tue Jun 26 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-13.1
+* Wed Aug 15 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-20
+- makedumpfile: when refiltering, initialize refiltered bitmap2 from the kdump file's bitmap2
+- dracut-module-setup: Fix DRM module inclusion test for hyper-v
+- kdumpctl: remove some cmdline inheritage from 1st kernel
+- kdump-lib.sh:get_loaded_kernel_modules() Fix missing newline
+- kdumpctl: Rebuild initramfs if loaded kernel modules changed (V2)
+- Revert "kdumpctl: Rebuild initramfs if loaded kernel modules changed"
+- dracut-module-setup: Fix test for inclusion of DRM modules
+
+* Wed Aug 01 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-19
+kexec-tools.spec: Drop kexec-tools-2.0.3-disable-kexec-test.patch
+Remove obsolete kdump tool
+
+* Tue Jul 31 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-18
+kdumpctl: Rebuild initramfs if loaded kernel modules changed
+dracut-module-setup.sh: don't include multipath-hostonly
+Add document to declare FCoE support (V2)
+Revert "Add document to declare FCoE support"
+Add document to declare FCoE support
+makedumpfile: fix makedumpfile Not tainted in 2nd kernel
+
+* Tue Jul 10 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-17
+- arm64: Fix calculation of page_offset in case we are running cases other than mem-usage
+
+* Fri Jun 22 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-16
+- kexec/ppc64: add support to parse ibm, dynamic-memory-v2
+
+* Thu Jun 21 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-15
+- dracut-module-setup.sh: pass ip=either6 param for ipv6
+- dracut-module-setup.sh: install /etc/hosts when using fence_kdump
+- update kdump-anaconda-addon-003-29-g4c517c5.tar.gz
+
+* Tue Jun 19 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-14
+- kdumpctl: Remove 'netroot' and 'iscsi initiator' entries from kdump cmdline
+- doc: remove btrfs from supported filesystems list
+- Update kdump anaconda addon
+- makedumpfile/arm64: Add '--mem-usage' support
+- Fix warning about persistent device name not found.
+- kdumpctl: Check the modification time of core_collector
+- kdump.sysconfig.x86_64: Remove 'notsc' from KDUMP_COMMANDLINE_REMOVE
 - makedumpfile: fix for hugepages filtering
 
 * Thu Feb 8 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-13

@@ -1,0 +1,36 @@
+From 8449bda73ab14516d4bf81d29503c1ea203bb865 Mon Sep 17 00:00:00 2001
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Tue, 6 Mar 2018 02:13:00 +0900
+Subject: [PATCH 3/3] Documentation: Update documentation regarding
+ --mem-usage' option
+
+Earlier patch in this patchset, enables the '--mem-usage' makedumpfile
+option on arm64 platforms.
+
+In addition, I have validated the '--mem-usage' makedumpfile option
+on several ppc64/ppc64le and s390x machines, so update the
+'makedumpfile.8' documentation to indicate that '--mem-usage' option is
+supported not only on x86_64, but also on ppc64, s390x and arm64
+platforms.
+
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ makedumpfile.8 | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/makedumpfile-1.6.2/makedumpfile.8 b/makedumpfile-1.6.2/makedumpfile.8
+index 15db7947d62f..3ccfc65798be 100644
+--- a/makedumpfile-1.6.2/makedumpfile.8
++++ b/makedumpfile-1.6.2/makedumpfile.8
+@@ -593,7 +593,7 @@ last cleared on the crashed kernel, through "dmesg --clear" for example.
+ 
+ .TP
+ \fB\-\-mem-usage\fR
+-This option is only for x86_64.
++This option is currently supported on x86_64, arm64, ppc64 and s390x.
+ This option is used to show the page numbers of current system in different
+ use. It should be executed in 1st kernel. By the help of this, user can know
+ how many pages is dumpable when different dump_level is specified. It analyzes
+-- 
+2.7.4
+

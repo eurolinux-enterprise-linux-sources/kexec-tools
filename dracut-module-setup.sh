@@ -7,13 +7,6 @@ if ! [[ -d "${initdir}/tmp" ]]; then
     mkdir -p "${initdir}/tmp"
 fi
 
-is_mpath() {
-    local _dev=$1
-    [ -e /sys/dev/block/$_dev/dm/uuid ] || return 1
-    [[ $(cat /sys/dev/block/$_dev/dm/uuid) =~ mpath- ]] && return 0
-    return 1
-}
-
 check() {
     [[ $debug ]] && set -x
     #kdumpctl sets this explicitly
@@ -27,7 +20,7 @@ check() {
 depends() {
     local _dep="base shutdown"
 
-    if [ -d /sys/module/drm/drivers ]; then
+    if [ -n "$( find /sys/devices -name drm )" ] || [ -d /sys/module/hyperv_fb ]; then
         _dep="$_dep drm"
     fi
 
@@ -35,7 +28,6 @@ depends() {
         _dep="$_dep network"
     fi
 
-    for_each_host_dev_and_slaves is_mpath && _dep="$_dep multipath-hostonly"
     echo $_dep
     return 0
 }
@@ -293,6 +285,8 @@ kdump_setup_netdev() {
     _static=$(kdump_static_ip $_netdev $_srcaddr)
     if [ -n "$_static" ]; then
         _proto=none
+    elif is_ipv6_address $_srcaddr; then
+        _proto=either6
     else
         _proto=dhcp
     fi
@@ -693,6 +687,8 @@ kdump_configure_fence_kdump () {
         kdump_install_net $node
     done
 
+    dracut_install /etc/hosts
+    dracut_install /etc/nsswitch.conf
     dracut_install $FENCE_KDUMP_SEND
 }
 

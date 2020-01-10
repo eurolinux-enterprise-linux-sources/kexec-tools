@@ -1,0 +1,39 @@
+From aec51ef7aee483cc5bf16844bdbacb1c70619f15 Mon Sep 17 00:00:00 2001
+From: Petr Tesarik <ptesarik@suse.com>
+Date: Wed, 20 Jun 2018 11:50:19 +0200
+Subject: [PATCH 2/2] [PATCH 2/2] Check if clock_gettime() requires -lrt
+
+For glibc versions before 2.17, clock_gettime() was contained in a
+separate library and required linking with -lrt.
+
+Signed-off-by: Petr Tesarik <ptesarik@suse.com>
+---
+ Makefile | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/makedumpfile-1.6.2/Makefile b/makedumpfile-1.6.2/Makefile
+index 612b9d0..142a387 100644
+--- a/makedumpfile-1.6.2/Makefile
++++ b/makedumpfile-1.6.2/Makefile
+@@ -68,6 +68,18 @@ endif
+ 
+ LIBS := -lpthread $(LIBS)
+ 
++try-run = $(shell set -e;		\
++	TMP=".$$$$.tmp";		\
++	if ($(1)) >/dev/null 2>&1;	\
++	then echo "$(2)";		\
++	else echo "$(3)";		\
++	fi;				\
++	rm -f "$$TMP")
++
++LINK_TEST_PROG="int clock_gettime(); int main(){ return clock_gettime(); }"
++LIBS := $(LIBS) $(call try-run,\
++	echo $(LINK_TEST_PROG) | $(CC) $(CFLAGS) -o "$$TMP" -x c -,,-lrt)
++
+ all: makedumpfile
+ 
+ $(OBJ_PART): $(SRC_PART)
+-- 
+2.9.5
+

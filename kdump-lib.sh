@@ -103,7 +103,7 @@ kdump_get_persistent_dev() {
     }
 
     if [[ $2 = "raw" ]];then
-	_lookup_dirs="/dev/mapper/* /dev/disk/by-id/*"
+	_lookup_dirs="/dev/mapper/* /dev/disk/by-id/* /dev/disk/by-path/*"
     else
 	_lookup_dirs="/dev/mapper/* /dev/disk/by-uuid/* /dev/disk/by-id/*"
     fi
@@ -506,4 +506,15 @@ get_dracut_args_fstype()
 get_dracut_args_target()
 {
     echo $1 | grep "\-\-mount" | sed "s/.*--mount .\(.*\)/\1/" | cut -d' ' -f1
+}
+
+# Get currently loaded modules
+# sorted, and delimited by newline
+get_loaded_kernel_modules()
+{
+    local modules=( )
+    while read _module _size _used _used_by; do
+        modules+=( "$_module" )
+    done <<< "$(lsmod | sed -n '1!p')"
+    printf '%s\n' "${modules[@]}" | sort
 }
