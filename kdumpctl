@@ -382,6 +382,16 @@ check_boot_dir()
 
 setup_initrd()
 {
+	check_boot_dir
+
+	if [ -z "$KDUMP_KERNELVER" ]; then
+		kdump_kver=`uname -r`
+	else
+		kdump_kver=$KDUMP_KERNELVER
+	fi
+
+	kdump_kernel="${KDUMP_BOOTDIR}/${KDUMP_IMG}-${kdump_kver}${KDUMP_IMG_EXT}"
+
 	DEFAULT_INITRD="${KDUMP_BOOTDIR}/initramfs-`uname -r`.img"
 	DEFAULT_INITRD_BAK="${KDUMP_BOOTDIR}/.initramfs-`uname -r`.img.default"
 	if [ $DEFAULT_DUMP_MODE == "fadump" ]; then
@@ -628,15 +638,6 @@ check_rebuild()
 	local _force_no_rebuild force_no_rebuild="0"
 	local ret system_modified="0"
 
-	check_boot_dir
-
-	if [ -z "$KDUMP_KERNELVER" ]; then
-		kdump_kver=`uname -r`
-	else
-		kdump_kver=$KDUMP_KERNELVER
-	fi
-
-	kdump_kernel="${KDUMP_BOOTDIR}/${KDUMP_IMG}-${kdump_kver}${KDUMP_IMG_EXT}"
 	setup_initrd
 	if [ $? -ne 0 ]; then
 		return 1
@@ -1212,6 +1213,42 @@ start()
 	echo "Starting kdump: [OK]"
 }
 
+reload()
+{
+	check_current_status
+	if [ $? -ne 0 ]; then
+		echo "Kdump is not running: [WARNING]"
+		return 0
+	fi
+
+	if [ $DEFAULT_DUMP_MODE == "fadump" ]; then
+		stop_fadump
+	else
+		stop_kdump
+	fi
+
+	if [ $? -ne 0 ]; then
+		echo "Stopping kdump: [FAILED]"
+		return 1
+	fi
+
+	echo "Stopping kdump: [OK]"
+
+	setup_initrd
+	if [ $? -ne 0 ]; then
+		echo "Starting kdump: [FAILED]"
+		return 1
+	fi
+
+	start_dump
+	if [ $? -ne 0 ]; then
+		echo "Starting kdump: [FAILED]"
+		return 1
+	fi
+
+	echo "Starting kdump: [OK]"
+}
+
 stop_fadump()
 {
 	echo 0 > $FADUMP_REGISTER_SYS_NODE
@@ -1295,6 +1332,9 @@ main ()
 		esac
 		exit $EXIT_CODE
 		;;
+	  reload)
+		reload
+		;;
 	  restart)
 		stop
 		start
@@ -1308,7 +1348,7 @@ main ()
 		show_reserved_mem
 		;;
 	  *)
-		echo $"Usage: $0 {start|stop|status|restart|propagate|showmem}"
+		echo $"Usage: $0 {start|stop|status|restart|reload|propagate|showmem}"
 		exit 1
 	esac
 }

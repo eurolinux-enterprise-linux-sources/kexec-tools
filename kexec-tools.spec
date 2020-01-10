@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.15
-Release: 21%{?dist}.3
+Release: 21%{?dist}.4
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -429,6 +429,9 @@ done
 %doc
 
 %changelog
+* Mon Jun 10 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.4
+- [Hyper-V] Error applying Memory changes to larger size
+
 * Fri Mar 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.3
 - makedumpfile/arm64: Fix 'info->page_offset' calculation (use correct
   bug number)
