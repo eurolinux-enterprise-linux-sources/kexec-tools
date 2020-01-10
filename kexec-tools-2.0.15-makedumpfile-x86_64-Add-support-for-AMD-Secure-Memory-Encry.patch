@@ -1,0 +1,231 @@
+Delivered-To: bhsharma@gapps.redhat.com
+Received: by 2002:a2e:e0a:0:0:0:0:0 with SMTP id 10csp381404ljo;
+        Fri, 21 Jun 2019 02:43:25 -0700 (PDT)
+X-Google-Smtp-Source: APXvYqzT5Jnctz0U7KDu97glThU9nNU8uoBaTPDtgGoLDaTrBerwj871GlRx1br1kO3Xi9egk5Ga
+X-Received: by 2002:a0c:d0fc:: with SMTP id b57mr43991751qvh.78.1561110205383;
+        Fri, 21 Jun 2019 02:43:25 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1561110205; cv=none;
+        d=google.com; s=arc-20160816;
+        b=UGnWY4xATAi/VC/zo6DWbisWbInCXQEb7saZdCpdFg6DjOXNGTGy8OoGOrKaF2an1F
+         /30UqiXL5Yd3KF5eCKmMCuvQ+CUwUKDAUtewF1t4iGMe6Z3aIi4z6mZaDZELpIIeYSOh
+         WO0qQC+gnyBlQuAbDBSo5NUprcZ8xMsCs0d5kZr3BVgGOXJtZgmIBVLV4yKHRjDW29Nn
+         P/pelr5UUYaNW1C0ILMv60vk0Py4VM5oRTQ4otxgkw9soGxUjTsMEA0X49vOdVrfXa9P
+         QZbvmXrMB22TNGHkWgPjAkHFxXakJEDq18fwX0dTuxTbx9vlFyaaBdv+CQ+yqfixS70j
+         +93w==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;
+        h=message-id:date:subject:cc:to:from:delivered-to;
+        bh=0Hr1bq++ZN4c9flsD+ZIcevaW3VxsiFEPs30XoiYUL4=;
+        b=paFXhKPPrG7vRaUqzedY45uKY678PbjOiGQSyfzC6DSZFuZ4NepnUyEGwVmd+b0Scc
+         O6bzSXYRuXGALKasZkfkEeJLyJUldvlZcmcnGO64gmKGyEq8wmrGGG3J66y2M9UC22NI
+         PQ6u0bmWizODueS2cKkHJ+MsmkJ91523n359wDPTb5hyt25mZ/Ax9s7SfHzshVHjdvLx
+         Ugmod/BpgtWaxDUKoIdM4a6hM9UOLcyla/XE5HlJlijZHVa0rmQLvKqHBpdWD6FgacTJ
+         BF6xPn0fDSZqWz4LwElIuzRiF405Hp8cq4LxGvTZNVm4F9WK+QurgUq/Um/LeJWZ0fgF
+         kfTA==
+ARC-Authentication-Results: i=1; mx.google.com;
+       spf=pass (google.com: domain gapps.redhat.com configured 209.132.183.28 as internal address) smtp.mailfrom=lijiang@redhat.com
+Return-Path: <lijiang@redhat.com>
+Received: from mx1.redhat.com (mx1.redhat.com. [209.132.183.28])
+        by mx.google.com with ESMTPS id u34si1484288qtj.352.2019.06.21.02.43.25
+        for <bhsharma@gapps.redhat.com>
+        (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+        Fri, 21 Jun 2019 02:43:25 -0700 (PDT)
+Received-SPF: pass (google.com: domain gapps.redhat.com configured 209.132.183.28 as internal address)
+Authentication-Results: mx.google.com;
+       spf=pass (google.com: domain gapps.redhat.com configured 209.132.183.28 as internal address) smtp.mailfrom=lijiang@redhat.com
+Received: from smtp.corp.redhat.com (int-mx04.intmail.prod.int.phx2.redhat.com [10.5.11.14])
+	(using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+	(No client certificate requested)
+	by mx1.redhat.com (Postfix) with ESMTPS id 8C7DB3004425
+	for <bhsharma@gapps.redhat.com>; Fri, 21 Jun 2019 09:43:24 +0000 (UTC)
+Received: by smtp.corp.redhat.com (Postfix)
+	id 8712D5D9E5; Fri, 21 Jun 2019 09:43:24 +0000 (UTC)
+Delivered-To: bhsharma@redhat.com
+Received: from localhost.localdomain.com (ovpn-12-71.pek2.redhat.com [10.72.12.71])
+	by smtp.corp.redhat.com (Postfix) with ESMTP id BF70C5D9D2;
+	Fri, 21 Jun 2019 09:43:17 +0000 (UTC)
+From: Lianbo Jiang <lijiang@redhat.com>
+To: bhsharma@redhat.com
+Cc: lijiang@redhat.com
+Subject: [PATCH] x86_64: Add support for AMD Secure Memory Encryption
+Date: Fri, 21 Jun 2019 17:43:12 +0800
+Message-Id: <20190621094312.3180-1-lijiang@redhat.com>
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.14
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16 (mx1.redhat.com [10.5.110.49]); Fri, 21 Jun 2019 09:43:24 +0000 (UTC)
+
+On AMD machine with Secure Memory Encryption (SME) feature, if SME is
+enabled, page tables contain a specific attribute bit (C-bit) in their
+entries to indicate whether a page is encrypted or unencrypted.
+
+So get NUMBER(sme_mask) from vmcoreinfo, which stores the value of
+the C-bit position, and drop it to obtain the true physical address.
+
+Signed-off-by: Lianbo Jiang <lijiang@redhat.com>
+---
+ arch/x86_64.c  | 28 +++++++++++++++++++---------
+ makedumpfile.c |  4 ++++
+ makedumpfile.h |  1 +
+ 3 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/makedumpfile-1.6.2/arch/x86_64.c b/makedumpfile-1.6.2/arch/x86_64.c
+index 33621f1f259c..d897e35f062e 100644
+--- a/makedumpfile-1.6.2/arch/x86_64.c
++++ b/makedumpfile-1.6.2/arch/x86_64.c
+@@ -259,6 +259,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ {
+ 	unsigned long page_dir, pml4, pgd_paddr, pgd_pte, pmd_paddr, pmd_pte;
+ 	unsigned long pte_paddr, pte;
++	unsigned long entry_mask = ENTRY_MASK;
+ 
+ 	/*
+ 	 * Get PGD.
+@@ -269,6 +270,10 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ 		if (page_dir == NOT_PADDR)
+ 			return NOT_PADDR;
+ 	}
++
++	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
++		entry_mask &= ~(NUMBER(sme_mask));
++
+ 	page_dir += pml4_index(vaddr) * sizeof(unsigned long);
+ 	if (!readmem(PADDR, page_dir, &pml4, sizeof pml4)) {
+ 		ERRMSG("Can't get pml4 (page_dir:%lx).\n", page_dir);
+@@ -285,7 +290,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ 	/*
+ 	 * Get PUD.
+ 	 */
+-	pgd_paddr  = pml4 & ENTRY_MASK;
++	pgd_paddr  = pml4 & entry_mask;
+ 	pgd_paddr += pgd_index(vaddr) * sizeof(unsigned long);
+ 	if (!readmem(PADDR, pgd_paddr, &pgd_pte, sizeof pgd_pte)) {
+ 		ERRMSG("Can't get pgd_pte (pgd_paddr:%lx).\n", pgd_paddr);
+@@ -299,13 +304,13 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ 		return NOT_PADDR;
+ 	}
+ 	if (pgd_pte & _PAGE_PSE)	/* 1GB pages */
+-		return (pgd_pte & ENTRY_MASK & PGDIR_MASK) +
++		return (pgd_pte & entry_mask & PGDIR_MASK) +
+ 			(vaddr & ~PGDIR_MASK);
+ 
+ 	/*
+ 	 * Get PMD.
+ 	 */
+-	pmd_paddr  = pgd_pte & ENTRY_MASK;
++	pmd_paddr  = pgd_pte & entry_mask;
+ 	pmd_paddr += pmd_index(vaddr) * sizeof(unsigned long);
+ 	if (!readmem(PADDR, pmd_paddr, &pmd_pte, sizeof pmd_pte)) {
+ 		ERRMSG("Can't get pmd_pte (pmd_paddr:%lx).\n", pmd_paddr);
+@@ -319,13 +324,13 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ 		return NOT_PADDR;
+ 	}
+ 	if (pmd_pte & _PAGE_PSE)	/* 2MB pages */
+-		return (pmd_pte & ENTRY_MASK & PMD_MASK) +
++		return (pmd_pte & entry_mask & PMD_MASK) +
+ 			(vaddr & ~PMD_MASK);
+ 
+ 	/*
+ 	 * Get PTE.
+ 	 */
+-	pte_paddr  = pmd_pte & ENTRY_MASK;
++	pte_paddr  = pmd_pte & entry_mask;
+ 	pte_paddr += pte_index(vaddr) * sizeof(unsigned long);
+ 	if (!readmem(PADDR, pte_paddr, &pte, sizeof pte)) {
+ 		ERRMSG("Can't get pte (pte_paddr:%lx).\n", pte_paddr);
+@@ -338,7 +343,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
+ 		ERRMSG("Can't get a valid pte.\n");
+ 		return NOT_PADDR;
+ 	}
+-	return (pte & ENTRY_MASK) + PAGEOFFSET(vaddr);
++	return (pte & entry_mask) + PAGEOFFSET(vaddr);
+ }
+ 
+ unsigned long long
+@@ -553,6 +558,7 @@ find_vmemmap_x86_64()
+ 	unsigned long pmd, tpfn;
+ 	unsigned long pvaddr = 0;
+ 	unsigned long data_addr = 0, last_data_addr = 0, start_data_addr = 0;
++	unsigned long pmask = PMASK;
+ 	/*
+ 	 * data_addr is the paddr of the page holding the page structs.
+ 	 * We keep lists of contiguous pages and the pfn's that their
+@@ -569,6 +575,10 @@ find_vmemmap_x86_64()
+ 		ERRMSG("init_level4_pgt not found\n");
+ 		return FAILED;
+ 	}
++
++	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
++		pmask &= ~(NUMBER(sme_mask));
++
+ 	pagestructsize = size_table.page;
+ 	hugepagesize = PTRS_PER_PMD * info->page_size;
+ 	vaddr_base = info->vmemmap_start;
+@@ -597,7 +607,7 @@ find_vmemmap_x86_64()
+ 			return FAILED;
+ 		}
+ 		/* mask the pgd entry for the address of the pud page */
+-		pud_addr &= PMASK;
++		pud_addr &= pmask;
+ 		if (pud_addr == 0)
+ 			  continue;
+ 		/* read the entire pud page */
+@@ -610,7 +620,7 @@ find_vmemmap_x86_64()
+ 		/* pudp points to an entry in the pud page */
+ 		for (pudp = (unsigned long *)pud_page, pudindex = 0;
+ 					pudindex < PTRS_PER_PUD; pudindex++, pudp++) {
+-			pmd_addr = *pudp & PMASK;
++			pmd_addr = *pudp & pmask;
+ 			/* read the entire pmd page */
+ 			if (pmd_addr == 0)
+ 				continue;
+@@ -652,7 +662,7 @@ find_vmemmap_x86_64()
+ 				 * - we discontiguous page is a string of valids
+ 				 */
+ 				if (pmd) {
+-					data_addr = (pmd & PMASK);
++					data_addr = (pmd & pmask);
+ 					if (start_range) {
+ 						/* first-time kludge */
+ 						start_data_addr = data_addr;
+diff --git a/makedumpfile-1.6.2/makedumpfile.c b/makedumpfile-1.6.2/makedumpfile.c
+index c9634cd42858..ed097c7e597a 100644
+--- a/makedumpfile-1.6.2/makedumpfile.c
++++ b/makedumpfile-1.6.2/makedumpfile.c
+@@ -960,6 +960,8 @@ next_page:
+ 	read_size = MIN(info->page_size - PAGEOFFSET(paddr), size);
+ 
+ 	pgaddr = PAGEBASE(paddr);
++	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
++		pgaddr = pgaddr & ~(NUMBER(sme_mask));
+ 	pgbuf = cache_search(pgaddr, read_size);
+ 	if (!pgbuf) {
+ 		++cache_miss;
+@@ -2248,6 +2250,7 @@ write_vmcoreinfo_data(void)
+ 
+ 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
+ 	WRITE_NUMBER("N_ONLINE", N_ONLINE);
++	WRITE_NUMBER("sme_mask", sme_mask);
+ 
+ 	WRITE_NUMBER("PG_lru", PG_lru);
+ 	WRITE_NUMBER("PG_private", PG_private);
+@@ -2642,6 +2645,7 @@ read_vmcoreinfo(void)
+ 
+ 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
+ 	READ_NUMBER("N_ONLINE", N_ONLINE);
++	READ_NUMBER("sme_mask", sme_mask);
+ 
+ 	READ_NUMBER("PG_lru", PG_lru);
+ 	READ_NUMBER("PG_private", PG_private);
+diff --git a/makedumpfile-1.6.2/makedumpfile.h b/makedumpfile-1.6.2/makedumpfile.h
+index 5f7a1dcf3b2f..bc3a4555132a 100644
+--- a/makedumpfile-1.6.2/makedumpfile.h
++++ b/makedumpfile-1.6.2/makedumpfile.h
+@@ -1860,6 +1860,7 @@ struct array_table {
+ struct number_table {
+ 	long	NR_FREE_PAGES;
+ 	long	N_ONLINE;
++	long    sme_mask;
+ 
+ 	/*
+  	* Page flags
+-- 
+2.17.1
+

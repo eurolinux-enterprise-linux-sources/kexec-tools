@@ -49,7 +49,7 @@ storage:
 network:
         Hardware using kernel modules: (tg3, igb, ixgbe, sfc, e1000e, bna,
               cnic, netxen_nic, qlge, bnx2x, bnx, qlcnic, be2net, enic,
-              virtio-net, ixgbevf, igbvf)
+              virtio-net, ixgbevf, igbvf, atlantic)
         protocol: ipv4
         bonding
         vlan

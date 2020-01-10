@@ -148,6 +148,9 @@ prepare_cmdline()
 	if [ ! -z ${id} ] ; then
 		cmdline=$(append_cmdline "${cmdline}" disable_cpu_apicid ${id})
 	fi
+	if has_hpwdt; then
+		cmdline="${cmdline} rd.driver.pre=hpwdt"
+	fi
 
 	KDUMP_COMMANDLINE=$cmdline
 }
@@ -314,7 +317,6 @@ check_config()
 			;;
 		raw|ext2|ext3|ext4|minix|btrfs|xfs|nfs|ssh|sshkey|path|core_collector|kdump_post|kdump_pre|extra_bins|extra_modules|default|force_rebuild|force_no_rebuild|dracut_args|fence_kdump_args|fence_kdump_nodes)
 			# remove inline comments after the end of a directive.
-			config_val=$(strip_comments $config_val)
 			[ -z "$config_val" ] && {
 				echo "Invalid kdump config value for option $config_opt."
 				return 1;
@@ -329,7 +331,7 @@ check_config()
 			return 1;
 			;;
 		esac
-	done < $KDUMP_CONFIG_FILE
+	done <<< "$(read_strip_comments $KDUMP_CONFIG_FILE)"
 
 	check_default_config || return 1
 
@@ -445,6 +447,9 @@ check_dump_fs_modified()
 	local _old_dev _old_mntpoint _old_fstype
 	local _new_dev _new_mntpoint _new_fstype
 	local _target _path _dracut_args
+	local _target_drivers _module_name
+
+	local _old_drivers="$(lsinitrd $TARGET_INITRD -f /usr/lib/dracut/loaded-kernel-modules.txt | tr '\n' ' ')"
 
 	# No need to check in case of mount target specified via "dracut_args".
 	if is_mount_in_dracut_args; then
@@ -472,6 +477,38 @@ check_dump_fs_modified()
 			return 2
 		fi
 	fi
+
+	_record_block_drivers() {
+		local _drivers
+		if [[ -b /dev/block/$1 ]]; then
+			_drivers=$(udevadm info -a "/dev/block/$1" | sed -n 's/\s*DRIVERS=="\(\S\+\)"/\1/p')
+		fi
+		if [[ -b $1 ]]; then
+			_drivers=$(udevadm info -a "$1" | sed -n 's/\s*DRIVERS=="\(\S\+\)"/\1/p')
+		fi
+		for _driver in $_drivers; do
+			if ! [[ " $_target_drivers " == *" $_driver "* ]]; then
+				_target_drivers="$_target_drivers $_driver"
+			fi
+		done
+		return 1
+	}
+
+	check_block_and_slaves_all _record_block_drivers "$(get_maj_min "$_target")"
+	for _driver in $_target_drivers; do
+		# Older version of kmod util doesn't give module name, so follow Kbuild's
+		# name-fix rule and deduce the name.
+		_module_name=$(echo "$_driver" | sed "s/\(,\|-\)/_/g")
+		# Target is mounted already, if module is not included by current kernel,
+		# could be a deprecated/invalid driver name or builtin module
+		if ! (grep -q "\b$_module_name\b" /proc/modules); then
+			continue
+		fi
+		if ! [[ " $_old_drivers " == *" $_module_name "* ]]; then
+			echo "Detected change in block device driver, $_module_name is not included"
+			return 1
+		fi
+	done
 
 	if [[ $(expr substr $_new_fstype 1 3) = "nfs" ]];then
 		_new_dev=$_target
@@ -570,31 +607,6 @@ check_wdt_modified()
 	return 1
 }
 
-check_kmodules_modified()
-{
-	# always sort again to avoid LANG/LC inconsistent problem
-	local _old_modules="$(lsinitrd $TARGET_INITRD -f /usr/lib/dracut/loaded-kernel-modules.txt | sort)"
-	local _new_modules="$(get_loaded_kernel_modules | sort)"
-
-	[[ -z $_old_modules ]] && echo "Warning: Previous loaded kernel module list is absent or empty"
-
-	local _added_modules=$(comm -13 <(echo "$_old_modules") <(echo "$_new_modules"))
-	local _dropped_modules=$(comm -23 <(echo "$_old_modules") <(echo "$_new_modules"))
-
-	if [ "$_old_modules" != "$_new_modules" ]; then
-		echo "Detected change(s) of loaded kernel modules list:"
-		[[ -n $_added_modules ]] && for _module in $_added_modules; do
-			echo "	+$_module"
-		done
-		[[ -n $_dropped_modules ]] && for _module in $_dropped_modules; do
-			echo "	-$_module"
-		done
-		return 1
-	fi
-
-	return 0
-}
-
 # returns 0 if system is not modified
 # returns 1 if system is modified
 # returns 2 if system modification is invalid
@@ -619,11 +631,6 @@ check_system_modified()
 	check_wdt_modified
 	if [ $? -ne 0 ]; then
 		echo "Detected change in watchdog state"
-		return 1
-	fi
-
-	check_kmodules_modified
-	if [ $? -ne 0 ]; then
 		return 1
 	fi
 
@@ -787,7 +794,6 @@ check_ssh_config()
 		case "$config_opt" in
 		sshkey)
 			# remove inline comments after the end of a directive.
-			config_val=$(strip_comments $config_val)
 			if [ -f "$config_val" ]; then
 				# canonicalize the path
 				SSH_KEY_LOCATION=$(/usr/bin/readlink -m $config_val)
@@ -796,17 +802,15 @@ check_ssh_config()
 			fi
 			;;
 		path)
-			config_val=$(strip_comments $config_val)
 			SAVE_PATH=$config_val
 			;;
 		ssh)
-			config_val=$(strip_comments $config_val)
 			DUMP_TARGET=$config_val
 			;;
 		*)
 			;;
 		esac
-	done < $KDUMP_CONFIG_FILE
+	done <<< "$(read_strip_comments $KDUMP_CONFIG_FILE)"
 
 	#make sure they've configured kdump.conf for ssh dumps
 	local SSH_TARGET=`echo -n $DUMP_TARGET | sed -n '/.*@/p'`
@@ -1222,7 +1226,8 @@ reload()
 	fi
 
 	if [ $DEFAULT_DUMP_MODE == "fadump" ]; then
-		stop_fadump
+		reload_fadump
+		return $?
 	else
 		stop_kdump
 	fi
@@ -1276,6 +1281,26 @@ stop_kdump()
 
 	echo "kexec: unloaded kdump kernel"
 	return 0
+}
+
+reload_fadump()
+{
+	echo 1 > $FADUMP_REGISTER_SYS_NODE
+	if [ $? == 0 ]; then
+		echo "fadump: re-registered successfully"
+		return 0
+	else
+		# FADump could fail on older kernel where re-register
+		# support is not enabled. Try stop/start from userspace
+		# to handle such scenario.
+		stop_fadump
+		if [ $? == 0 ]; then
+			start_fadump
+			return $?
+		fi
+	fi
+
+	return 1
 }
 
 stop()

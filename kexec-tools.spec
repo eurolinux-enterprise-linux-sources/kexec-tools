@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.15
-Release: 21%{?dist}.4
+Release: 33%{?dist}
 License: GPLv2
 Group: Applications/System
 Summary: The kexec/kdump userspace component.
@@ -15,7 +15,8 @@ Source9: http://downloads.sourceforge.net/project/makedumpfile/makedumpfile/1.6.
 Source10: kexec-kdump-howto.txt
 Source11: fadump-howto.txt
 Source12: mkdumprd.8
-Source14: 98-kexec.rules
+Source13: 98-kexec.rules
+Source14: 98-kexec.rules.ppc64
 Source15: kdump.conf.5
 Source16: kdump.service
 Source18: kdump.sysconfig.s390x
@@ -63,6 +64,7 @@ Obsoletes: diskdumputils netdump
 #
 # Patches 0 through 100 are meant for x86 kexec-tools enablement
 #
+Patch0: kexec-tools-2.0.15-i386-kdump-fix-an-error-that-can-not-parse-the-e820-reser.patch
 
 #
 # Patches 101 through 200 are meant for x86_64 kexec-tools enablement
@@ -116,8 +118,9 @@ Patch719: kexec-tools-2.0.15-makedumpfile-Use-integer-arithmetics-for-th.patch
 Patch720: kexec-tools-2.0.15-makedumpfile-Use-monotonic-clock-to-calculate-ETA-and-s.patch
 Patch721: kexec-tools-2.0.15-makedumpfile-Check-if-clock_gettime-requires-lrt.patch
 Patch722: kexec-tools-2.0.15-makedumpfile-when-refiltering-initialize-refiltered-bitm.patch
-Patch723: kexec-tools-2.0.15-makedumpfile-Prepare-paddr_to_vaddr-for-arch-specific-p2v-c.patch
-Patch724: kexec-tools-2.0.15-makedumpfile-arm64-restore-info-page_offset-and-implement-paddr_t.patch
+Patch723: kexec-tools-2.0.15-makedumpfile-Update-help-text-to-indicate-mem-usage-is-supp.patch
+Patch724: kexec-tools-2.0.15-makedumpfile-exclude-pages-that-are-logically-offline.patch
+Patch725: kexec-tools-2.0.15-makedumpfile-x86_64-Add-support-for-AMD-Secure-Memory-Encry.patch
 
 
 #
@@ -158,6 +161,7 @@ tar -z -x -v -f %{SOURCE19}
 tar -z -x -v -f %{SOURCE25}
 
 
+%patch0 -p1
 %patch101 -p1
 %patch301 -p1
 %patch302 -p1
@@ -188,6 +192,7 @@ tar -z -x -v -f %{SOURCE25}
 %patch722 -p1
 %patch723 -p1
 %patch724 -p1
+%patch725 -p1
 
 
 %ifarch ppc
@@ -262,9 +267,12 @@ install -m 644 %{SOURCE12} $RPM_BUILD_ROOT%{_mandir}/man8/mkdumprd.8
 install -m 644 %{SOURCE28} $RPM_BUILD_ROOT%{_mandir}/man8/kdumpctl.8
 install -m 755 %{SOURCE20} $RPM_BUILD_ROOT%{_prefix}/lib/kdump/kdump-lib.sh
 install -m 755 %{SOURCE24} $RPM_BUILD_ROOT%{_prefix}/lib/kdump/kdump-lib-initramfs.sh
-%ifnarch s390x
+%ifnarch s390x ppc64 ppc64le
 # For s390x the ELF header is created in the kdump kernel and therefore kexec
 # udev rules are not required
+install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
+%endif
+%ifarch ppc64 ppc64le
 install -m 644 %{SOURCE14} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 %endif
 install -m 644 %{SOURCE15} $RPM_BUILD_ROOT%{_mandir}/man5/kdump.conf.5
@@ -429,18 +437,49 @@ done
 %doc
 
 %changelog
-* Mon Jun 10 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.4
-- [Hyper-V] Error applying Memory changes to larger size
+* Sat Jun 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-33
+- makedumpfile: x86_64: Add support for AMD Secure Memory Encryption
+  [Fix the Fix the patch to make sure makedumpfile-1.6.2/ path is used]
 
-* Fri Mar 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.3
-- makedumpfile/arm64: Fix 'info->page_offset' calculation (use correct
-  bug number)
+* Fri Jun 21 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-32
+- makedumpfile: exclude pages that are logically offline
+- makedumpfile: x86_64: Add support for AMD Secure Memory Encryption
 
-* Fri Mar 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.2
-- makedumpfile/arm64: Fix 'info->page_offset' calculation
+* Mon Jun 10 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-31
+- Disable vmcore device dump by default
 
-* Tue Mar 12 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-21.1
+* Wed May 22 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-30
+- Optimize kdumpctl restart and initramfs rebuild speed
+
+* Thu May 9 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-29
+- Fix previous faulty initramfs rebuild triggering
+
+* Thu May 9 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-28
+- kexec.rules: create dedicated udev rules for ppc64
+
+* Wed Mar 27 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-27
+- kexec-kdump-howto: Add note on setting correct value of kptr_restrict
+
+* Mon Mar 18 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-26
+- fadump: leverage kernel support to re-regisgter FADump
+
+* Mon Mar 18 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-25
+- Make udev reload rules quiet during bootup
+
+* Thu Mar 7 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-24
+- mkdumprd: use --quiet dracut argument to speedup initramfs build
 - mkdumprd: refine regex on dropping mount options
+
+* Fri Feb 8 2019 Bhupesh Sharma <bhsharma@redhat.com> 2.0.15-23
+- kdump: fix an error that can not parse the e820 reserved region
+- Doc: add document to declare atlantic support
+
+* Fri Jan 18 2019 Pingfan Liu <piliu@redhat.com> 2.0.15-22
+- doc/kdump.conf: Local dump path should be <mnt>/<path>/%HOST_IP-%DATE
+- Update help text to indicate --mem-usage is supported on archs other than x86_64
+- Add missing usage info
+- Rewrite kdump's udev rules, use reload instead of restart
+- kdumpctl: Add reload support
 
 * Thu Aug 30 2018 Pingfan Liu <piliu@redhat.com> 2.0.15-21
 - kexec/ppc64: add support to parse ibm, dynamic-memory-v2 

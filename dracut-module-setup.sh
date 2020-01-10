@@ -445,7 +445,6 @@ kdump_install_conf() {
     while read config_opt config_val;
     do
         # remove inline comments after the end of a directive.
-        config_val=$(strip_comments $config_val)
         case "$config_opt" in
         ext[234]|xfs|btrfs|minix|raw)
             sed -i -e "s#^$config_opt[[:space:]]\+$config_val#$config_opt $(kdump_to_udev_name $config_val)#" ${initdir}/tmp/$$-kdump.conf
@@ -468,7 +467,7 @@ kdump_install_conf() {
             dracut_install "${config_val%%[[:blank:]]*}"
             ;;
         esac
-    done < /etc/kdump.conf
+    done <<< "$(read_strip_comments /etc/kdump.conf)"
 
     default_dump_target_install_conf
 

@@ -35,7 +35,10 @@ is_wdt_addition_needed
 [[ $? -eq 0 ]] && WDTCFG="-a watchdog"
 
 extra_modules=""
-dracut_args=("--hostonly" "--hostonly-cmdline" "--hostonly-i18n" "--hostonly-mode" "strict" "-o" "plymouth dash resume ifcfg" $WDTCFG)
+if has_hpwdt; then
+	extra_modules=hpwdt
+fi
+dracut_args=("--quiet" "--hostonly" "--hostonly-cmdline" "--hostonly-i18n" "--hostonly-mode" "strict" "-o" "plymouth dash resume ifcfg" $WDTCFG)
 OVERRIDE_RESETTABLE=0
 
 add_dracut_arg() {
@@ -440,7 +443,6 @@ fi
 while read config_opt config_val;
 do
     # remove inline comments after the end of a directive.
-    config_val=$(strip_comments $config_val)
     case "$config_opt" in
     extra_modules)
         extra_modules="$extra_modules $config_val"
@@ -492,13 +494,9 @@ do
         add_dracut_arg $config_val
         ;;
     *)
-        if [ -n $(echo $config_opt | grep "^#.*$") ]
-        then
-            continue
-        fi
         ;;
     esac
-done < $conf_file
+done <<< "$(read_strip_comments $conf_file)"
 
 handle_default_dump_target
 

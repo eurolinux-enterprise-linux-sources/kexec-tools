@@ -61,6 +61,14 @@ strip_comments()
     echo $@ | sed -e 's/\(.*\)#.*/\1/'
 }
 
+# Read from kdump config file stripping all comments
+read_strip_comments()
+{
+    # strip heading spaces, and print any content starting with
+    # neither space or #, and strip everything after #
+    sed -n -e "s/^\s*\([^# \t][^#]\+\).*/\1/gp" $1
+}
+
 # Check if fence kdump is configured in Pacemaker cluster
 is_pcs_fence_kdump()
 {
@@ -337,6 +345,11 @@ is_ipv6_address()
     echo $1 | grep -q ":"
 }
 
+has_hpwdt()
+{
+    cat /proc/modules | grep -q hpwdt
+}
+
 # get ip address or hostname from nfs/ssh config value
 get_remote_host()
 {
@@ -508,13 +521,62 @@ get_dracut_args_target()
     echo $1 | grep "\-\-mount" | sed "s/.*--mount .\(.*\)/\1/" | cut -d' ' -f1
 }
 
-# Get currently loaded modules
-# sorted, and delimited by newline
-get_loaded_kernel_modules()
-{
-    local modules=( )
-    while read _module _size _used _used_by; do
-        modules+=( "$_module" )
-    done <<< "$(lsmod | sed -n '1!p')"
-    printf '%s\n' "${modules[@]}" | sort
+# get_maj_min <device>
+# Prints the major and minor of a device node.
+# Example:
+# $ get_maj_min /dev/sda2
+# 8:2
+get_maj_min() {
+    local _maj _min _majmin
+    _majmin="$(stat -L -c '%t:%T' "$1" 2>/dev/null)"
+    printf "%s" "$((0x${_majmin%:*})):$((0x${_majmin#*:}))"
+}
+
+# Not every device in /dev/mapper should be examined.
+# If it is an LVM device, touch only devices which have /dev/VG/LV symlink.
+lvm_internal_dev() {
+    local dev_dm_dir=/sys/dev/block/$1/dm
+    [[ ! -f $dev_dm_dir/uuid || $(<$dev_dm_dir/uuid) != LVM-* ]] && return 1 # Not an LVM device
+    local DM_VG_NAME DM_LV_NAME DM_LV_LAYER
+    eval $(dmsetup splitname --nameprefixes --noheadings --rows "$(<$dev_dm_dir/name)" 2>/dev/null)
+    [[ ${DM_VG_NAME} ]] && [[ ${DM_LV_NAME} ]] || return 0 # Better skip this!
+    [[ ${DM_LV_LAYER} ]] || [[ ! -L /dev/${DM_VG_NAME}/${DM_LV_NAME} ]]
+}
+
+check_vol_slaves_all() {
+    local _lv _vg _pv _majmin
+    _majmin="$2"
+    _lv="/dev/block/$_majmin"
+    _dm="/sys/dev/block/$_majmin/dm"
+    [[ -f $_dm/uuid  && $(<$_dm/uuid) =~ LVM-* ]] || return 1
+    _vg=$(dmsetup splitname --noheadings -o vg_name $(<"$_dm/name") )
+    # strip space
+    _vg="${_vg//[[:space:]]/}"
+    if [[ $_vg ]]; then
+        for _pv in $(lvm vgs --noheadings -o pv_name "$_vg" 2>/dev/null)
+        do
+            check_block_and_slaves_all $1 $(get_maj_min $_pv)
+        done
+        return 0
+    fi
+    return 1
+}
+
+check_block_and_slaves_all() {
+    local _x _ret=1
+    [[ -b /dev/block/$2 ]] || return 1 # Not a block device? So sorry.
+    if ! lvm_internal_dev $2 && "$1" $2; then
+        _ret=0
+    fi
+    check_vol_slaves_all "$@" && return 0
+    if [[ -f /sys/dev/block/$2/../dev ]] && [[ /sys/dev/block/$2/../subsystem -ef /sys/class/block ]]; then
+        check_block_and_slaves_all $1 $(<"/sys/dev/block/$2/../dev") && _ret=0
+    fi
+    [[ -d /sys/dev/block/$2/slaves ]] || return 1
+    for _x in /sys/dev/block/$2/slaves/*; do
+        [[ -f $_x/dev ]] || continue
+        [[ $_x/subsystem -ef /sys/class/block ]] || continue
+        check_block_and_slaves_all $1 $(<"$_x/dev") && _ret=0
+    done
+    return $_ret
 }
